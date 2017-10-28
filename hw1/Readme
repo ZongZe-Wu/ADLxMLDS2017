@@ -1,0 +1,22 @@
+For testing :
+
+	rnn : ./hw1_rnn.sh $1 $2
+	cnn : ./hw1_cnn.sh $1 $2
+	best : ./hw1_best.sh $1 $2
+
+	$1 : data directory, $2 : output file
+
+
+For training :
+	rnn : ./model_rnn.sh $1 $2
+	$1 : data directory, $2 : model name
+	cnn : ./model_cnn.sh $1 $2
+	$1 : data directory, $2 : model name
+
+	best : I use ensemble methods, so there are a lot of models
+		1.best model from the rnn training
+		2.best model from the cnn training
+		3.best model for mfcc in cnn training : python3 model_cnn_mfcc.py $1 $2  ($1 : data directory, $2 : model name)
+		4.best model for fbank in rnn training : python3 model_rnn_fbank.py $1 $2  ($1 : data directory, $2 : model name)
+		5.best model for fusing fbank and mfcc : python3 get_npy.py $1	($1 : data directory)	->	python3 model-fusing.py $1 ($1 : model name)	
+

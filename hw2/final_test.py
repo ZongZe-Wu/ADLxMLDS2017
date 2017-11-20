@@ -102,7 +102,7 @@ def main(argv):
 		#label[label_data[i]['id']] = label_data[i]['caption']
 	print(len(caption_all))
 	#print(label[filename_list[0]])
-	vectorizer = CountVectorizer(tokenizer=TB().tokenize, min_df = 0.0001)
+	vectorizer = CountVectorizer(tokenizer=TB().tokenize, min_df = 0.00005)
 	vectorizer.fit(list(itertools.chain.from_iterable(caption_all)))
 	print(vectorizer.transform(['we']))
 	#print(vectorizer.vocabulary_)
@@ -185,12 +185,12 @@ def main(argv):
 		for j in range(len(prediction[i])):
 			#if prediction[i][j] != 6086 and prediction[i][j] != 12 and prediction[i][j] != 6087:
 				#if j == 0:			
-			if prediction[i][j] != max_voc_size and prediction[i][j] != max_voc_size+1:	
+			if prediction[i][j] < max_voc_size: 	
 				if j == 0:
 					file.write(inv_map[prediction[i][j]])
 					file.write(' ')
 					buf.append(inv_map[prediction[i][j]])
-				elif inv_map[prediction[i][j]] != buf[-1]:
+				elif inv_map[prediction[i][j]] != buf[-1] and prediction[i][j]!=max_voc_size-1:
 					file.write(inv_map[prediction[i][j]])
 					buf.append(inv_map[prediction[i][j]])
 					file.write(' ')
@@ -206,12 +206,12 @@ def main(argv):
 		for j in range(len(peer_prediction[i])):
 			#if prediction[i][j] != 6086 and prediction[i][j] != 12 and prediction[i][j] != 6087:
 				#if j == 0:			
-			if peer_prediction[i][j] != max_voc_size and peer_prediction[i][j] != max_voc_size+1:	
+			if peer_prediction[i][j] < max_voc_size:	
 				if j == 0:
 					file.write(inv_map[peer_prediction[i][j]])
 					file.write(' ')
 					buf.append(inv_map[peer_prediction[i][j]])
-				elif inv_map[peer_prediction[i][j]] != buf[-1]:
+				elif inv_map[peer_prediction[i][j]] != buf[-1] and peer_prediction[i][j]!=max_voc_size-1::
 					file.write(inv_map[peer_prediction[i][j]])
 					buf.append(inv_map[peer_prediction[i][j]])
 					file.write(' ')

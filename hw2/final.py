@@ -17,10 +17,10 @@ def batch_generation(features, labels, batch_size, iteration, loss, prev_rd, max
 	#seed(int(iteration/20))
 	#rd = randint(0,37)
 	#if loss < 20*(500-iteration)/500:
-		#seed(int(iteration/20))
+	#	seed(int(iteration/20))
 	rd = randint(0,37)
 	#else:
-		#rd = prev_rd
+	#	rd = prev_rd
 	for i in range(0, len_size, batch_size):
 		#if iteration % 2 == 0:		
 		x = features[1][i:i+batch_size]
@@ -154,6 +154,7 @@ class Model(object):
 		self.output_size = output_size
 		#self.batch_size = batch_size
 		self.threshold_sampling = 0.5
+		self.hidden_size = 256
 		self.training = training
 		with tf.name_scope('inputs'):
 			self.xs = tf.placeholder(tf.float32, shape = [None, self.frame_size, self.input_size], name = 'xs')
@@ -163,6 +164,7 @@ class Model(object):
 			self.batch_size = tf.placeholder(tf.int32, [], name = 'batch_size')
 			self.bos = tf.placeholder(tf.int32, [None], name = 'bos')
 			self.for_training = tf.placeholder(tf.bool, name = 'for_training')
+
 		with tf.variable_scope('LSTM_cell'):
 			self.Ws_embedding = self._weight_variables([self.output_size, 256], name = 'weights0')
 			self.bs_embedding = self._bias_variables([1, 256], name = 'biases0')
@@ -242,12 +244,12 @@ class Model(object):
 			#Ws_decode = self._weight_variables([256, self.output_size], name = 'weights0')
 			#bs_decode = self._bias_variables([1, 6087], name = 'biases0')
 			#embedding_layer = tf.matmul(output_states_2, self.Ws_embedding) + self.bs_embedding
-			decode_layer = tf.matmul(output_states_2, self.Ws_decode) + self.bs_decode
-			loss = tf.losses.softmax_cross_entropy(self.onehot_label[:,i,:], decode_layer)
-			if i == 0:
-				self.losses = loss*self.mask[:,i]
-			else:
-				self.losses += loss*self.mask[:,i]
+			#decode_layer = tf.matmul(output_states_2, self.Ws_decode) + self.bs_decode
+			#loss = tf.losses.softmax_cross_entropy(self.onehot_label[:,i,:], decode_layer)
+			#if i == 0:
+			#	self.losses = loss*self.mask[:,i]
+			#else:
+			#	self.losses += loss*self.mask[:,i]
 			#print('att_mat~~~~~ :', att_mat.shape)
 		print('encoding~~~')
 		
@@ -283,21 +285,27 @@ class Model(object):
 					#self.bos = tf.one_hot([6087]*50, depth = self.output_size, axis = -1)
 					#self.embedding_bos = tf.reshape(tf.matmul(tf.reshape(self.bos, [-1, self.output_size]), self.Ws_embedding) + self.bs_embedding, [-1, 256])
 					fused_input = tf.concat([output_states, self.embedding_bos], 1)
+
 				else:
-					fused_input = tf.concat([output_states, self.schedule_sampling(0.99999999, i-1, output_states_2)], 1)
+					decode_layer_0 = tf.nn.softmax(tf.matmul(output_states_2, self.Ws_decode) + self.bs_decode)
+					embedding_decode = tf.reshape(tf.matmul(tf.reshape(decode_layer_0, [-1, self.output_size]), self.Ws_embedding) + self.bs_embedding, [-1, 256])
+					fused_input = tf.concat([output_states, self.schedule_sampling(0.99999999, i-1, embedding_decode)], 1)
 				#fused_input = tf.concat([weighted_sum, output_states, self.schedule_sampling(0.995, i-1, output_states_2)], 1)
 			with tf.variable_scope('lstm_1'):
 				output_states_2, internal_state_2 = encode_layer_1(fused_input, internal_state_2)		
 			#embedding_layer = tf.matmul(output_states_2, self.Ws_embedding) + self.bs_embedding
-			decode_layer_1 = tf.matmul(output_states_2, self.Ws_decode) + self.bs_decode
+			decode_layer_1 =tf.matmul(output_states_2, self.Ws_decode) + self.bs_decode
 			if i == 80:
-				predict = tf.expand_dims(decode_layer_1,1)
+				predict = tf.expand_dims(tf.nn.softmax(decode_layer_1),1)
 			else:
-				predict = tf.concat([predict, tf.expand_dims(decode_layer_1, 1)], 1)
+				predict = tf.concat([predict, tf.expand_dims(tf.nn.softmax(decode_layer_1), 1)], 1)
 			#correct_prediction = tf.equal(tf.argmax(decode_layer,-1), tf.argmax(self.onehot_label[:,i,:],-1))
 			#word_accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 			loss = tf.losses.softmax_cross_entropy(self.onehot_label[:,i,:], decode_layer_1)
-			self.losses += loss*self.mask[:,i]
+			if i == 80:
+				self.losses = loss
+			else:
+				self.losses += loss*self.mask[:,i]
 		self.prediction = tf.argmax(predict, 2)
 		self.answer = tf.argmax(self.onehot_label, 2)
 		self.ground_truth = self.ys
@@ -343,7 +351,7 @@ def main(argv):
 	testing_npy = np.array(testing_npy)
 	print('testing_npy : ', testing_npy.shape)		
 	test_feature_list = np.array(test_feature_list)
-	
+	#features = (test_file, test_feature_list)
 	with open(argv[0] + 'training_label.json') as label_file:
 		label_data = json.load(label_file)
 	#print(label_data[0]['id'])
@@ -354,7 +362,7 @@ def main(argv):
 		#label[label_data[i]['id']] = label_data[i]['caption']
 	print(len(caption_all))
 	#print(label[filename_list[0]])
-	vectorizer = CountVectorizer(tokenizer=TB().tokenize, min_df = 0.0001)
+	vectorizer = CountVectorizer(tokenizer=TB().tokenize, min_df = 0.00005)
 	vectorizer.fit(list(itertools.chain.from_iterable(caption_all)))
 	print(vectorizer.transform(['we']))
 	#print(vectorizer.vocabulary_)
@@ -385,6 +393,8 @@ def main(argv):
 				else:
 					buf[k] = "unknown"
 			buf_max = max_value(buf_max, len(buf))
+			#if len(buf) == 43:
+			#	print(buf)
 			arr = (vectorizer.transform(buf)).nonzero()[1]
 			arr1 = np.append(np.array([max_voc_size]*80), arr)
 			seq_len_buf.append(arr.shape[0])
@@ -393,7 +403,7 @@ def main(argv):
 		#print(np.array(label_buf).shape)
 		label[label_data[i]['id']] = (np.array(label_buf), seq_len_buf)
 	print('filename_list[0] : ', filename_list[0])
-	print('len(label[filename_list[0]]) : ', label[filename_list[0]][0][0])
+	print('len(label[filename_list[0]]) : ', label["CL49s8bO6Fg_1_11.avi"][0][0])
 	print(buf_max)
 	print('buf_len_min : ',buf_len_min)
 	print('buf_len_max : ', buf_len_max)
@@ -404,9 +414,9 @@ def main(argv):
 	print(inv_map[12])
 	print(label_buf[-1])
 	print('80~~~~',label_buf[-1][80])
-	for j in range(len(label_buf[-1])):
-		if label_buf[-1][j] != max_voc_size and label_buf[-1][j] != max_voc_size+1:
-			print(inv_map[label_buf[-1][j]], end=' ')
+	for j in range(len(label["CL49s8bO6Fg_1_11.avi"][0][0])):
+		if label["CL49s8bO6Fg_1_11.avi"][0][0][j] != max_voc_size and label["CL49s8bO6Fg_1_11.avi"][0][0][j] != max_voc_size+1:
+			print(inv_map[label["CL49s8bO6Fg_1_11.avi"][0][0][j]], end=' ')
 	print('\n')
 	#print(vectorizer.inverse_transform(vectorizer.transform(['A'])[0].todense()[0]))
 
@@ -455,10 +465,35 @@ def main(argv):
 			else:
 				print(prediction[check][j], end=' ')
 		print('\n')
-		for j in range(len(answer[check])):
+		for j in range(80,len(answer[check])):
 			if answer[check][j] != max_voc_size and answer[check][j] != max_voc_size+1:
 				print(inv_map[answer[check][j]], end=' ')
+			else:
+				print(answer[check][j], end=' ')
 		print('\n')
+		print('fucking~~~mask')
+		for j in range(80,len(mask[check])):
+			print(mask[check][j], end=' ')
+		print('\n')
+		feed_dict = {
+			model.xs : train_x,
+			model.ys : train_y,
+			model.seq_len : seq_length,
+			model.mask : mask,
+			model.batch_size : int(np.array(train_x).shape[0]),
+			model.bos : bos,
+			model.for_training : False
+		}
+		test_prediction = sess.run(model.prediction,feed_dict = feed_dict)
+		print('~~~~fucking testing training data~~~~~')
+		for j in range(len(test_prediction[check])):
+			if test_prediction[check][j] != max_voc_size and test_prediction[check][j] != max_voc_size+1:
+				print(inv_map[test_prediction[check][j]], end=' ')
+			else:
+				print(test_prediction[check][j], end=' ')
+		print('\n')
+
+		'''
 		test_prediction = sess.run(model.prediction,feed_dict = {model.ys : train_y[:5], model.for_training : False, model.xs : test_feature_list[:5,:,:], model.batch_size : int((test_feature_list[:5,:,:]).shape[0]), model.bos : [max_voc_size+1]*int((test_feature_list[:5,:,:]).shape[0])})
 		#print(test)
 		print('~~~~fucking testing~~~~~')
@@ -471,7 +506,7 @@ def main(argv):
 			else:	
 				print(test_prediction[k][j], end=' ')
 			print('\n')	
-		'''
+		
 		for j in range(len(ground_truth[-1])):
 			if ground_truth[-1][j] != 6086:
 				print(inv_map[ground_truth[-1][j]], end=' ')
@@ -483,7 +518,7 @@ def main(argv):
 		'''
 		if i % 5 == 0:	
 			print('~~~~~save~~~~~modle~~~~~fuck')		
-			save_path = saver.save(sess, "final/final.ckpt")
+			save_path = saver.save(sess, "Model/model_dyn_final.ckpt")
 	'''	
 	prediction = sess.run([model.prediction],feed_dict = {model.xs : testing_npy})
 	print(np.array(prediction).shape)

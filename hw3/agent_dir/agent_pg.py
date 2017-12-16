@@ -317,7 +317,10 @@ class Agent_PG(Agent):
         #print('========')
         #print(prob_weights)
         #print(norm_observation)
-        action = np.random.choice(range(prob_weights.shape[1]), p=prob_weights.ravel())  # select action w.r.t the actions prob
+        if test:
+            action = np.argmax(prob_weights)
+        else:
+            action = np.random.choice(range(prob_weights.shape[1]), p=prob_weights.ravel())  # select action w.r.t the actions prob
         #print(action, end='')
         return action
 
